@@ -74,8 +74,8 @@ sess.run(tf.global_variables_initializer())
 
 cost = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(logits=net_output, labels=y_true))
 
-eta = 0.01
-optimizer = tf.train.AdamOptimizer(eta).minimize(cost)
+eta = 0.05
+optimizer = tf.train.GradientDescentOptimizer(eta).minimize(cost)
 
 
 sess = tf.Session()
@@ -114,5 +114,5 @@ print("Accuracy for test set: {}".format(sess.run(accuracy,
                    y_true: mnist.test.labels
                })))
 
-image_tensor = sess.run(tf.shape(tf.image.resize_images(image, [28, 28])))
+image_tensor = sess.run(tf.shape(tf.image.resize_images(image_to_test, [28, 28])))
 print("From File: ", image_tensor)

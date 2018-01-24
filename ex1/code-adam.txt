@@ -1,7 +1,19 @@
 import tensorflow as tf
+import os
 import tensorflow.examples.tutorials.mnist.input_data as input_data
 import numpy as np
 import matplotlib.pyplot as plt
+
+image_reader = tf.WholeFileReader()
+BASE_PATH = "C:\\Users\\itommen\\Desktop\\repositories\\machine-learning-final\\ex1\\images";
+current_folder_filename_list = os.listdir(BASE_PATH)
+abc = BASE_PATH + "\\" + current_folder_filename_list[0]
+image_data = tf.gfile.FastGFile(abc, 'rb').read()
+image_to_test = tf.image.decode_jpeg(image_data)
+# plt.subplot(333)
+# # we can visualize any one of the images by reshaping it to a 28x28 image
+# plt.imshow(np.reshape(image_data, (28, 28)), cmap='gray')
+# plt.show()
 
 # read the data and labels as ont-hot vectors
 # one-hot means a sparse vector for every observation where only
@@ -87,7 +99,7 @@ for epoch_i in range(n_epochs):
     
     print('Validation accuracy for epoch {} is: {}'.format(epoch_i + 1, loss))
     l_loss.append(loss)
-
+    
 plt.subplot(222)
 plt.title('Logistic Regression Acuracy')
 plt.ylabel('Accuracy')
@@ -101,3 +113,6 @@ print("Accuracy for test set: {}".format(sess.run(accuracy,
                    net_input: mnist.test.images,
                    y_true: mnist.test.labels
                })))
+
+image_tensor = sess.run(tf.shape(tf.image.resize_images(image, [28, 28])))
+print("From File: ", image_tensor)

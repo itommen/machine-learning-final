@@ -1,0 +1,103 @@
+import tensorflow as tf
+import tensorflow.examples.tutorials.mnist.input_data as input_data
+import numpy as np
+import matplotlib.pyplot as plt
+
+# read the data and labels as ont-hot vectors
+# one-hot means a sparse vector for every observation where only
+# the class label is 1, and every other class is 0.
+# more info here:
+mnist = input_data.read_data_sets('MNIST_data/', one_hot=True)
+
+%matplotlib inline
+# mnist is now a DataSet with accessors for:
+#'train', 'test', and 'validation'.
+# within each, we can access:
+# images, labels, and num_examples
+print('train: ', mnist.train.num_examples)
+print('test: ', mnist.test.num_examples)
+print('validation: ', mnist.validation.num_examples)
+
+# the images are stored as:
+# n_observations x n_features tensor (n-dim array)
+# the labels are stored as n_observations x n_labels,
+# where each observation is a one-hot vector.
+print('images: (images, pixels)', mnist.train.images.shape)
+print('labels: (images, classifcations)', mnist.train.labels.shape)
+
+# the range of the values of the images is from 0-1
+# TODO: should check what is it excacly
+print(np.min(mnist.train.images), np.max(mnist.train.images))
+
+plt.subplot(111)
+# we can visualize any one of the images by reshaping it to a 28x28 image
+plt.imshow(np.reshape(mnist.train.images[2], (28, 28)), cmap='gray')
+plt.show()
+
+n_input = 784
+n_hidden = 256
+n_output = 10
+net_input = tf.placeholder(tf.float32, [None, n_input])
+#net_hidden = tf.placeholder(tf.float32, [None, n_hidden])
+y_true = tf.placeholder(tf.float32, [None, 10])
+
+W1 = tf.Variable(tf.truncated_normal ([n_input, n_hidden]))
+W2 = tf.Variable(tf.truncated_normal ([n_hidden, n_output]))
+b1 = tf.Variable(tf.truncated_normal([n_hidden]))
+b2 = tf.Variable(tf.truncated_normal ([n_output]))
+
+relu = tf.nn.relu(tf.matmul(net_input, W1) + b1)
+net_output = tf.nn.softmax(tf.matmul(relu, W2) + b2) # <-- THIS IS OUR MODEL!
+
+# prediction and actual using the argmax as the predicted label
+correct_prediction = tf.equal(tf.argmax(net_output, 1), tf.argmax(y_true, 1))
+
+# And now we can look at the mean of our network's correct guesses
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+
+cross_entropy = -tf.reduce_sum(y_true * tf.log(net_output))
+
+sess = tf.Session()
+sess.run(tf.global_variables_initializer())
+
+cost = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(logits=net_output, labels=y_true))
+
+eta = 0.01
+optimizer = tf.train.AdamOptimizer(eta).minimize(cost)
+
+
+sess = tf.Session()
+sess.run(tf.global_variables_initializer())
+l_loss = list()
+
+# train:
+batch_size = 100
+n_epochs = 10
+for epoch_i in range(n_epochs):
+    for batch_i in range(0, mnist.train.num_examples, batch_size):
+        batch_xs, batch_ys = mnist.train.next_batch(batch_size)
+        sess.run(optimizer, feed_dict={
+            net_input: batch_xs,
+            y_true: batch_ys
+        })
+
+    loss = sess.run(accuracy, feed_dict={
+                       net_input: mnist.validation.images,
+                       y_true: mnist.validation.labels })
+    
+    print('Validation accuracy for epoch {} is: {}'.format(epoch_i + 1, loss))
+    l_loss.append(loss)
+
+plt.subplot(222)
+plt.title('Logistic Regression Acuracy')
+plt.ylabel('Accuracy')
+plt.xlabel('Epochs')
+plt.plot(l_loss, color='m')
+plt.show()
+print('l_loss:',l_loss)
+
+print("Accuracy for test set: {}".format(sess.run(accuracy,
+               feed_dict={
+                   net_input: mnist.test.images,
+                   y_true: mnist.test.labels
+               })))

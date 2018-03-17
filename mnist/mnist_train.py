@@ -3,7 +3,7 @@ import tensorflow.examples.tutorials.mnist.input_data as input_data
 import numpy as np
 import matplotlib.pyplot as plt
 
-def gnerateModal():
+def gnerateLayers():
     n_input = 784
     n_hidden = 256
     n_second_hidden = 128
@@ -13,11 +13,14 @@ def gnerateModal():
     net_input = tf.placeholder(tf.float32, [None, n_input], name="input")    
 
     W = tf.Variable(tf.truncated_normal ([n_input, n_hidden]), name="w")
-    w2 = tf.Variable(tf.truncated_normal ([n_hidden, n_second_hidden]), name="w2")
-    w3 = tf.Variable(tf.truncated_normal ([n_second_hidden, n_output]), name="w3")
     b = tf.Variable(tf.truncated_normal ([n_hidden]), name="b")
+
+    w2 = tf.Variable(tf.truncated_normal ([n_hidden, n_second_hidden]), name="w2")
     b2 = tf.Variable(tf.truncated_normal ([n_second_hidden]), name="b2")
+
+    w3 = tf.Variable(tf.truncated_normal ([n_second_hidden, n_output]), name="w3")        
     b3 = tf.Variable(tf.truncated_normal ([n_output]), name="b3")
+    
     prob = tf.placeholder_with_default(1.0, shape=())
     net_output = tf.nn.softmax(tf.nn.sigmoid(tf.matmul(tf.nn.dropout(tf.nn.sigmoid(tf.matmul(tf.nn.sigmoid(tf.matmul(net_input, W) + b), w2) + b2), prob), w3) + b3), name="output") # <-- THIS IS OUR MODEL!
 
@@ -31,25 +34,27 @@ def printGraph(title, yLabel, xLabel, trainList, validationList):
     plt.plot(validationList, color='g')
     plt.show()
 
-mnist = input_data.read_data_sets('MNIST_data/', one_hot=True)
+def getOptimizer(cost):
+    eta = 0.005
+    return tf.train.AdamOptimizer(eta).minimize(cost)
 
-net_input, net_output, prob, y_true = gnerateModal()
+def calcTrainData(func, net_input, y_true):
+    train = sess.run(func, feed_dict={
+                           net_input: mnist.train.images,
+                           y_true: mnist.train.labels })
 
-correct_prediction = tf.equal(tf.argmax(net_output, 1), tf.argmax(y_true, 1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-cost = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(logits=net_output, labels=y_true))
+    validation = sess.run(func, feed_dict={
+                        net_input: mnist.validation.images,
+                        y_true: mnist.validation.labels })
 
-eta = 0.005
-optimizer = tf.train.AdamOptimizer(eta).minimize(cost)
+    return train, validation
 
-with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
+def trainModal(net_input, y_true, prob, cost, accuracy):
     l_accuracies_train = list()
     l_accuracies_validation = list()
     l_cost_train = list()
     l_cost_valid = list()
 
-    # train:
     batch_size = 150
     n_epochs = 30
     for epoch_i in range(n_epochs):
@@ -58,37 +63,45 @@ with tf.Session() as sess:
             sess.run(optimizer, feed_dict={
                 net_input: batch_xs,
                 y_true: batch_ys,
+                # TODO: should check what is this 'prob' meaning
                 prob: 0.6
             })
 
         # Loss Graphes data
-        cost_func_train = sess.run(cost, feed_dict={
-                           net_input: mnist.train.images,
-                           y_true: mnist.train.labels })
-        print('Validation cost for train epoch {} is: {}'.format(epoch_i + 1, cost_func_train))
-        l_cost_train.append(cost_func_train)
+        lossTrain, lossValidation = calcTrainData(cost, net_input, y_true)
+        print('Validation cost for train epoch {} is: {}'.format(epoch_i + 1, lossTrain))
+        l_cost_train.append(lossTrain)
 
-        cost_func_valid = sess.run(cost, feed_dict={
-                           net_input: mnist.validation.images,
-                           y_true: mnist.validation.labels })
-        print('Validation cost for valid epoch {} is: {}'.format(epoch_i + 1, cost_func_valid))
-        l_cost_valid.append(cost_func_valid)
+        print('Validation cost for valid epoch {} is: {}'.format(epoch_i + 1, lossValidation))
+        l_cost_valid.append(lossValidation)
 
 
-        # Accuracy grpahes data            
-        accuracy_func_train = sess.run(accuracy, feed_dict={
-                           net_input: mnist.train.images,
-                           y_true: mnist.train.labels })
-        print('Validation accuracy for train epoch {} is: {}'.format(epoch_i + 1, accuracy_func_train))
-        l_accuracies_train.append(accuracy_func_train)
+        # Accuracy grpahes data          
+        accuracyTrain, accuracyValidation = calcTrainData(accuracy, net_input, y_true)  
+        print('Validation accuracy for train epoch {} is: {}'.format(epoch_i + 1, accuracyTrain))
+        l_accuracies_train.append(accuracyTrain)
 
-        accuracy_func_validation = sess.run(accuracy, feed_dict={
-                           net_input: mnist.validation.images,
-                           y_true: mnist.validation.labels })
-        print('Validation accuracy for validation epoch {} is: {}'.format(epoch_i + 1, accuracy_func_validation))
-        l_accuracies_validation.append(accuracy_func_validation)
+        print('Validation accuracy for validation epoch {} is: {}'.format(epoch_i + 1, accuracyValidation))
+        l_accuracies_validation.append(accuracyValidation)
+    
+    return l_accuracies_train, l_accuracies_validation, l_cost_train, l_cost_valid
 
-    saver = tf.train.Saver()
+mnist = input_data.read_data_sets('MNIST_data/', one_hot=True)
+
+net_input, net_output, prob, y_true = gnerateLayers()
+
+correct_prediction = tf.equal(tf.argmax(net_output, 1), tf.argmax(y_true, 1))
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+cost = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(logits=net_output, labels=y_true))
+
+optimizer = getOptimizer(cost)
+
+with tf.Session() as sess:
+    sess.run(tf.global_variables_initializer())    
+
+    l_accuracies_train, l_accuracies_validation, l_cost_train, l_cost_valid =  trainModal(net_input, y_true, prob, cost, accuracy)
+
+    saver = tf.train.Saver()    
     saver.save(sess, "./digits_modelV3.ckpt")    
 
     printGraph('Logistic Regression Accuracy - Validation (Green) Vs Train (Purple)'

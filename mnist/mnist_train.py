@@ -56,7 +56,7 @@ def trainModal(net_input, y_true, prob, cost, accuracy):
     l_cost_valid = list()
 
     batch_size = 150
-    n_epochs = 30
+    n_epochs = 2
     for epoch_i in range(n_epochs):
         for batch_i in range(0, mnist.train.num_examples, batch_size):
             batch_xs, batch_ys = mnist.train.next_batch(batch_size)
@@ -86,6 +86,11 @@ def trainModal(net_input, y_true, prob, cost, accuracy):
     
     return l_accuracies_train, l_accuracies_validation, l_cost_train, l_cost_valid
 
+def saveModal(sess):
+    modal_file_name = "digits_modal"
+    saver = tf.train.Saver()    
+    saver.save(sess, "./{}.ckpt".format(modal_file_name))
+
 mnist = input_data.read_data_sets('MNIST_data/', one_hot=True)
 
 net_input, net_output, prob, y_true = gnerateLayers()
@@ -101,8 +106,7 @@ with tf.Session() as sess:
 
     l_accuracies_train, l_accuracies_validation, l_cost_train, l_cost_valid =  trainModal(net_input, y_true, prob, cost, accuracy)
 
-    saver = tf.train.Saver()    
-    saver.save(sess, "./digits_modelV3.ckpt")    
+    saveModal(sess)    
 
     printGraph('Logistic Regression Accuracy - Validation (Green) Vs Train (Purple)'
         , 'Accuracy'
@@ -118,7 +122,7 @@ with tf.Session() as sess:
 
     print("Accuracy for test set: {}". format(sess.run(accuracy,
                    feed_dict={
-                       net_input: mnist.validation.images,
-                       y_true: mnist.validation.labels
+                       net_input: mnist.test.images,
+                       y_true: mnist.test.labels
                    })))
 

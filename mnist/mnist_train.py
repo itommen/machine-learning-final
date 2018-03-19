@@ -9,19 +9,25 @@ def gnerateLayers():
     n_second_hidden = 128
     n_output = 10
 
+	#for the input
     y_true = tf.placeholder(tf.float32, [None, n_output])
     net_input = tf.placeholder(tf.float32, [None, n_input], name="input")    
 
+	#for first layer
     W = tf.Variable(tf.truncated_normal ([n_input, n_hidden]), name="w")
     b = tf.Variable(tf.truncated_normal ([n_hidden]), name="b")
 
+	#for second  layer
     w2 = tf.Variable(tf.truncated_normal ([n_hidden, n_second_hidden]), name="w2")
     b2 = tf.Variable(tf.truncated_normal ([n_second_hidden]), name="b2")
 
+	#for third layer
     w3 = tf.Variable(tf.truncated_normal ([n_second_hidden, n_output]), name="w3")        
     b3 = tf.Variable(tf.truncated_normal ([n_output]), name="b3")
     
     prob = tf.placeholder_with_default(1.0, shape=())
+	
+	#get the output from the network
     net_output = tf.nn.softmax(tf.nn.sigmoid(tf.matmul(tf.nn.dropout(tf.nn.sigmoid(tf.matmul(tf.nn.sigmoid(tf.matmul(net_input, W) + b), w2) + b2), prob), w3) + b3), name="output") # <-- THIS IS OUR MODEL!
 
     return net_input, net_output, prob, y_true
@@ -91,11 +97,16 @@ def saveModal(sess):
     saver = tf.train.Saver()    
     saver.save(sess, "./{}.ckpt".format(modal_file_name))
 
+#get the data (images)
 mnist = input_data.read_data_sets('MNIST_data/', one_hot=True)
 
+#create the network
 net_input, net_output, prob, y_true = gnerateLayers()
 
+# check if the given output is equal to the real value
 correct_prediction = tf.equal(tf.argmax(net_output, 1), tf.argmax(y_true, 1))
+
+
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 cost = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(logits=net_output, labels=y_true))
 

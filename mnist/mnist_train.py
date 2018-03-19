@@ -22,12 +22,7 @@ def gnerateLayers():
     b3 = tf.Variable(tf.truncated_normal ([n_output]), name="b3")
     
     prob = tf.placeholder_with_default(1.0, shape=())
-    net_output = tf.nn.softmax(
-        tf.nn.relu(tf.matmul(
-            tf.nn.sigmoid(tf.matmul(tf.nn.sigmoid(tf.matmul(net_input, W) + b), w2) + b2),
-            w3) + b3), 
-        name="output"
-    ) # <-- THIS IS OUR MODEL!
+    net_output = tf.nn.softmax(tf.nn.sigmoid(tf.matmul(tf.nn.dropout(tf.nn.sigmoid(tf.matmul(tf.nn.sigmoid(tf.matmul(net_input, W) + b), w2) + b2), prob), w3) + b3), name="output") # <-- THIS IS OUR MODEL!
 
     return net_input, net_output, prob, y_true
 
@@ -61,13 +56,14 @@ def trainModal(net_input, y_true, prob, cost, accuracy):
     l_cost_valid = list()
 
     batch_size = 200
-    n_epochs = 20
+    n_epochs = 30
     for epoch_i in range(n_epochs):
         for batch_i in range(0, mnist.train.num_examples, batch_size):
             batch_xs, batch_ys = mnist.train.next_batch(batch_size)
             sess.run(optimizer, feed_dict={
                 net_input: batch_xs,
-                y_true: batch_ys,                
+                y_true: batch_ys,
+                prob: 0.55
             })        
 
         # Accuracy grpahes data          
@@ -81,10 +77,10 @@ def trainModal(net_input, y_true, prob, cost, accuracy):
         # Loss Graphes data
         lossTrain, lossValidation = calcTrainData(cost, net_input, y_true)
         print('Validation cost for train epoch {} is: {}'.format(epoch_i + 1, lossTrain))
-        l_cost_train.append(3 - accuracyTrain)
+        l_cost_train.append(lossTrain)
 
         print('Validation cost for valid epoch {} is: {}'.format(epoch_i + 1, lossValidation))
-        l_cost_valid.append(3 - accuracyValidation)
+        l_cost_valid.append(lossValidation)
     
     return l_accuracies_train, l_accuracies_validation, l_cost_train, l_cost_valid
 
@@ -131,4 +127,3 @@ with tf.Session() as sess:
                        net_input: mnist.test.images,
                        y_true: mnist.test.labels
                    })))
-

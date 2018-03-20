@@ -69,7 +69,6 @@ def trainModal(net_input, y_true, prob, cost, accuracy):
             sess.run(optimizer, feed_dict={
                 net_input: batch_xs,
                 y_true: batch_ys,
-                # TODO: should check what is this 'prob' meaning
                 prob: 0.6
             })
 

@@ -22,6 +22,7 @@ num_classes = 1
 type_data_set_size = 1500
 batch_size = 4
 epochs = 2000
+
 (x_train, y_train), (x_test, y_test) = cifar10.load_data()
 
 class CreateGraphs(keras.callbacks.Callback):
@@ -48,22 +49,52 @@ class CreateGraphs(keras.callbacks.Callback):
         plt.plot(self.x, self.val_losses, label="val_loss")
         plt.legend()
         plt.show();
-        
-plot_losses = CreateGraphs()
 
-# load images from cifar and flower data and insert them to the same array in order to shuffle
-flower_images = []
-for root, dirnames, filenames in os.walk("./NewFlowers"):
-    for filename in filenames:
-        if re.search("\.(jpg|jpeg|png|bmp|tiff|gif)$", filename):
-            filepath = os.path.join(root, filename)
-            image = ndimage.imread(filepath, mode="RGB")
-            flower_images.append(misc.imresize(image, (32, 32)))
-            
-flower_zipped_images = list(zip([1] * type_data_set_size, flower_images[:type_data_set_size]))
-cifar10_zipped_images = list(zip([0] * type_data_set_size, x_train[:type_data_set_size]))            
-data = flower_zipped_images + cifar10_zipped_images
-shuffle(data)
+def removeLastLayers(loadedModel):    
+    loadedModel.layers.pop()
+    loadedModel.layers.pop()
+    loadedModel.layers.pop()
+    loadedModel.layers.pop()
+    loadedModel.layers.pop()
+
+def addLastBinaryLayer(loadedModel):
+    loadedModel.add(Dense(512))
+    loadedModel.add(Activation('relu'))
+    loadedModel.add(Dropout(0.5))
+    loadedModel.add(Dense(num_classes))
+    loadedModel.add(Activation('sigmoid'))
+
+def getData():
+    flower_images = []
+    for root, dirnames, filenames in os.walk("./NewFlowers"):
+        for filename in filenames:
+            if re.search("\.(jpg|jpeg|png|bmp|tiff|gif)$", filename):
+                filepath = os.path.join(root, filename)
+                image = ndimage.imread(filepath, mode="RGB")
+                flower_images.append(misc.imresize(image, (32, 32)))
+
+    flower_zipped_images = list(zip([1] * type_data_set_size, flower_images[:type_data_set_size]))
+    cifar10_zipped_images = list(zip([0] * type_data_set_size, x_train[:type_data_set_size]))            
+    data = flower_zipped_images + cifar10_zipped_images
+    shuffle(data)
+    
+    return data
+
+def getOptimizer():
+    return keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)
+
+def testModel(x_test, y_test):    
+    loss, accuracy = loadedModel.evaluate(x_test, y_test, verbose=1)
+    print('==> Test loss:', loss)
+    print('==> Test accuracy:', accuracy)
+
+def getCheckPoint():
+    filepath = 'fine_tune-ep{epoch:03d}-loss{loss:.3f}.h5'
+    return ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+    
+graphCallbacks = CreateGraphs()
+
+data = getData()
 
 # x - the predicted image, y - the real image
 x = [item[1] for item in data]
@@ -77,18 +108,10 @@ x_test = np.array(x[train_size:train_size + test_size])
 y_test = np.array(y[train_size:train_size + test_size])
 
 print ('loading model')
-loadedModel = load_model('cifar-bestmodel-ep339-loss0.504.h5')
+loadedModel = load_model('cifar-model.h5')
 print ('finished loading')
 
-# remove the last 2 layers (the fully connected)
-print(loadedModel.summary())
-loadedModel.layers.pop()
-loadedModel.layers.pop()
-loadedModel.layers.pop()
-loadedModel.layers.pop()
-loadedModel.layers.pop()
-print('--------------')
-print(loadedModel.summary())
+removeLastLayers(loadedModel)
 
 loadedModel.layers[-1].outbound_nodes = []
 loadedModel.outputs = [loadedModel.layers[-1].output]
@@ -96,36 +119,19 @@ loadedModel.outputs = [loadedModel.layers[-1].output]
 for layer in loadedModel.layers:
     layer.trainable = False
 
-# added the last 2 new layers that uses sigmoid because its a binary problem
-loadedModel.add(Dense(512))
-loadedModel.add(Activation('relu'))
-loadedModel.add(Dropout(0.5))
-loadedModel.add(Dense(num_classes))
-loadedModel.add(Activation('sigmoid'))
-print('--------------')
-print(loadedModel.summary())
+addLastBinaryLayer(loadedModel)
 
-# initiate RMSprop optimizer
-opt = keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)
+opt = getOptimizer()
 
-# Let's train the model using RMSprop
 loadedModel.compile(loss='binary_crossentropy',
                     optimizer=opt,
                     metrics=['accuracy'])
 
-# define checkpoint callback
-filepath = 'fine_tune-ep{epoch:03d}-loss{loss:.3f}.h5'
-checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+checkpoint = getCheckPoint()
 
-loadedModel.fit(x_train, y_train,  # this is our training examples & labels
+loadedModel.fit(x_train, y_train,
                 batch_size=batch_size,
                 epochs=epochs,
-                validation_split=0.1,  # this parameter control the % of train data used for validation
+                validation_split=0.1,
                 shuffle=True,
-                callbacks=[plot_losses, checkpoint])  # this prints our loss at the end of every epoch
-
-# Score trained model.
-scores = loadedModel.evaluate(x_test, y_test, verbose=1)
-print('==> Test loss:', scores[0])
-print('==> Test accuracy:', scores[1])
-
+                callbacks=[graphCallbacks, checkpoint]) 

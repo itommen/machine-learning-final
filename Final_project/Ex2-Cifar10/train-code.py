@@ -41,6 +41,28 @@ class CreateGraphs(keras.callbacks.Callback):
         plt.legend()
         plt.show();
 
+def getData():
+	(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+
+	shrink_data = True
+	if shrink_data:
+		selected_classes = [2, 3, 5, 6, 7]
+		print('train\n', x_train.shape, y_train.shape)
+		
+		x_train, y_train = filterBySelectedClasses(selected_classes, x_train, y_train)
+		print(x_train.shape, y_train.shape)
+		
+		print('test\n', x_test.shape, y_test.shape)
+		x_test, y_test = filterBySelectedClasses(selected_classes, x_test, y_test)
+		print(x_test.shape, y_test.shape)
+		num_classes = len(selected_classes)
+	else:
+		print('train\n', x_train.shape, y_train.shape)
+		print('test\n', x_test.shape, y_test.shape)
+		num_classes = 5
+		
+	return (x_train, y_train), (x_test, y_test), num_classes
+		
 def createModel():
     model = Sequential()
     model.add(Conv2D(32, (3, 3), padding='same',
@@ -67,10 +89,6 @@ def createModel():
     
     return model
         
-plot_losses = CreateGraphs()
-
-(x_train, y_train), (x_test, y_test) = cifar10.load_data()
-
 def filterBySelectedClasses(selected_classes, x_list, y_list):
     x = [ex for ex, ey in zip(x_list, y_list) if ey in selected_classes]
     y = [selected_classes.index(ey) for ex, ey in zip(x_list, y_list) if ey in selected_classes]
@@ -79,40 +97,31 @@ def filterBySelectedClasses(selected_classes, x_list, y_list):
 
 def getCheckPoint():
     filepath = 'cifar-bestmodel-ep{epoch:03d}-loss{loss:.3f}.h5'
-    return ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+    return ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')		
+	
+def getOptimizer():
+	learning_rate = 0.00015
+	decay = 1e-6
+	return keras.optimizers.rmsprop(lr=learning_rate, decay=decay)
+	
+def convertToCategorizedArrray(y_train, y_test, num_classes):
+	return keras.utils.to_categorical(y_train, num_classes), keras.utils.to_categorical(y_test, num_classes)
+	
+def testModel(x_test, y_test):
+	loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
+	print('# Test loss:', loss)
+	print('# Test accuracy:', accuracy)
+	
+graphCallbacks = CreateGraphs()
 
-shrink_data = True
-if shrink_data:
-    selected_classes = [2, 3, 5, 6, 7]
-    print('train\n', x_train.shape, y_train.shape)
-    
-    x_train, y_train = filterBySelectedClasses(selected_classes, x_train, y_train)
-    print(x_train.shape, y_train.shape)
-    
-    print('test\n', x_test.shape, y_test.shape)
-    x_test, y_test = filterBySelectedClasses(selected_classes, x_test, y_test)
-    print(x_test.shape, y_test.shape)
-    num_classes = len(selected_classes)
-else:
-    print('train\n', x_train.shape, y_train.shape)
-    print('test\n', x_test.shape, y_test.shape)
-    num_classes = 5
+(x_train, y_train), (x_test, y_test), num_classes = getData()
 
-# The data, shuffled and split between train and test sets:
-print('x_train shape:', x_train.shape)
-print(x_train.shape[0], 'train samples')
-print(x_test.shape[0], 'test samples')
-
-# Convert class vectors to binary class matrices.
-y_train = keras.utils.to_categorical(y_train, num_classes)
-y_test = keras.utils.to_categorical(y_test, num_classes)
+y_train, y_test = convertToCategorizedArrray(y_train, y_test, num_classes)
 
 model = createModel()
 
-# initiate RMSprop optimizer
-opt = keras.optimizers.rmsprop(lr=0.00015, decay=1e-6)
+opt = getOptimizer()
 
-# Let's train the model using RMSprop
 model.compile(loss='categorical_crossentropy',
               optimizer=opt,
               metrics=['accuracy'])
@@ -121,19 +130,17 @@ model.compile(loss='categorical_crossentropy',
 x_train = x_train.astype('float32') / 255
 x_test = x_test.astype('float32') / 255
 
+# When finding a better model (better accuracy) than the previous saved one, update the saved model.
 checkpoint = getCheckPoint();
 
-batch_size = 256
-epochs = 1
+batch_size = 150
+epochs = 2
 
-model.fit(x_train, y_train,  # this is our training examples & labels
+model.fit(x_train, y_train,
           batch_size=batch_size,
           epochs=epochs,
-          validation_split=0.1,  # this parameter control the % of train data used for validation
+          validation_split=0.1, #the percentage of the validation from the training
           shuffle=True,
-          callbacks=[plot_losses,checkpoint])  # this prints our loss at the end of every epoch
+          callbacks=[graphCallbacks,checkpoint])
 
-# Score trained model.
-loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
-print('# Test loss:', loss)
-print('# Test accuracy:', accuracy)
+testModel(x_test, y_test)
